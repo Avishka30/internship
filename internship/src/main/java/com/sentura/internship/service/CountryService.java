@@ -20,10 +20,13 @@ public class CountryService {
     public List<Country> getAllCountries() {
         // Fetch Countries [cite: 12] using the specific fields query to optimize payload
         String url = "https://restcountries.com/v3.1/all?fields=name,capital,region,population,flags";
-        JsonNode[] response = restTemplate.getForObject(url, JsonNode[].class);
+
+        // FIX: Changed JsonNode[].class to JsonNode.class
+        JsonNode response = restTemplate.getForObject(url, JsonNode.class);
         List<Country> countries = new ArrayList<>();
 
-        if (response != null) {
+        // FIX: Added response.isArray() safety check
+        if (response != null && response.isArray()) {
             for (JsonNode node : response) {
                 Country c = new Country();
                 c.setName(node.get("name").get("common").asText());
