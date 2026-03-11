@@ -10,8 +10,19 @@ function App() {
   useEffect(() => {
     fetch('http://localhost:8080/api/countries')
       .then(res => res.json())
-      .then(data => setCountries(data))
-      .catch(err => console.error("Error fetching data: ", err));
+      .then(data => {
+        // Protect against backend errors returning objects instead of arrays
+        if (Array.isArray(data)) {
+          setCountries(data);
+        } else {
+          console.error("Backend did not return an array:", data);
+          setCountries([]); // Fallback to an empty array to prevent crashes
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching data: ", err);
+        setCountries([]); // Also fallback here just in case
+      });
   }, []);
 
   // Typing in search box filters results 
@@ -45,7 +56,7 @@ function App() {
         </thead>
         <tbody>
           {filteredCountries.map((country, index) => (
-            // Click a row show popup/modal with details [cite: 38]
+            // Click a row show popup/modal with details
             <tr key={index} onClick={() => setSelectedCountry(country)}>
               <td><img src={country.flag} alt={`${country.name} flag`} width="40" /></td>
               <td>{country.name}</td>
