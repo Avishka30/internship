@@ -1,6 +1,7 @@
 package com.sentura.internship.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentura.internship.model.Country;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -15,38 +16,48 @@ import java.util.List;
 public class CountryService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Cacheable("countries")
     public List<Country> getAllCountries() {
-        // Fetch Countries [cite: 12] using the specific fields query to optimize payload
+        // Fetch Countries using the specific fields query to optimize payload
         String url = "https://restcountries.com/v3.1/all?fields=name,capital,region,population,flags";
-
-        // FIX: Changed JsonNode[].class to JsonNode.class
-        JsonNode response = restTemplate.getForObject(url, JsonNode.class);
         List<Country> countries = new ArrayList<>();
 
-        // FIX: Added response.isArray() safety check
-        if (response != null && response.isArray()) {
-            for (JsonNode node : response) {
-                Country c = new Country();
-                c.setName(node.get("name").get("common").asText());
-                c.setRegion(node.has("region") ? node.get("region").asText() : "");
-                c.setPopulation(node.has("population") ? node.get("population").asLong() : 0);
+        try {
+            // BULLETPROOF FIX: Fetch as a raw String first
+            String response = restTemplate.getForObject(url, String.class);
 
-                if (node.has("capital") && node.get("capital").isArray() && !node.get("capital").isEmpty()) {
-                    c.setCapital(node.get("capital").get(0).asText());
-                } else {
-                    c.setCapital("N/A");
-                }
+            if (response != null) {
+                // Manually parse the String into a JSON tree
+                JsonNode rootNode = objectMapper.readTree(response);
 
-                if (node.has("flags") && node.get("flags").has("svg")) {
-                    c.setFlag(node.get("flags").get("svg").asText());
-                } else {
-                    c.setFlag("");
+                if (rootNode.isArray()) {
+                    for (JsonNode node : rootNode) {
+                        Country c = new Country();
+                        c.setName(node.path("name").path("common").asText("Unknown"));
+                        c.setRegion(node.path("region").asText(""));
+                        c.setPopulation(node.path("population").asLong(0));
+
+                        if (node.path("capital").isArray() && !node.path("capital").isEmpty()) {
+                            c.setCapital(node.path("capital").get(0).asText());
+                        } else {
+                            c.setCapital("N/A");
+                        }
+
+                        if (node.path("flags").has("svg")) {
+                            c.setFlag(node.path("flags").path("svg").asText(""));
+                        } else {
+                            c.setFlag("");
+                        }
+                        countries.add(c);
+                    }
                 }
-                countries.add(c);
             }
+        } catch (Exception e) {
+            System.err.println("Error fetching or parsing country data: " + e.getMessage());
         }
+
         return countries;
     }
 
